@@ -535,3 +535,12 @@ export default function SendMessage() {
     </div>
   );
 }
+please allow i can upload real photo perfile and auto set in whatsapp number even the about to and fix error {
+  "eventMessage": "POST | 500 | http://zmkdygoyejtywrftzmkd.backend.onspace.ai/functions/v1/send-whatsapp-message | Internal Server Error",
+  "functionId": "send-whatsapp-message",
+  "id": "504361ee-f1b0-48fc-9aaa-7ade88e7da3f",
+  "logLevel": "ERROR",
+  "method": "POST",
+  "statusCode": 500,
+  "timestamp": 1777274844
+} please make sure all set success.
