@@ -2,7 +2,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
-// Service role client — bypasses all JWT / RLS checks
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -17,6 +16,7 @@ const supabase = createClient(
 
 const PHONE_NUMBER_ID = Deno.env.get("PHONE_NUMBER_ID") ?? "";
 const ACCESS_TOKEN = Deno.env.get("ACCESS_TOKEN") ?? "";
+const APP_ID = Deno.env.get("APP_ID") ?? ""; // <-- ADD THIS to your secrets
 const WA_API = `https://graph.facebook.com/v19.0`;
 
 async function logEvent(type: string, severity: string, message: string, metadata?: unknown) {
@@ -35,7 +35,7 @@ async function logEvent(type: string, severity: string, message: string, metadat
 function checkSecrets() {
   if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
     throw new Error(
-      "PHONE_NUMBER_ID or ACCESS_TOKEN not configured in Edge Function secrets. Go to OnSpace Cloud → Secrets to add them."
+      "PHONE_NUMBER_ID or ACCESS_TOKEN not configured in Edge Function secrets."
     );
   }
 }
@@ -65,38 +65,52 @@ async function sendWhatsAppText(to: string, body: string) {
   return data;
 }
 
-// ── Upload media to WhatsApp and return media_id ────────────────────────────
-async function uploadMediaToWhatsApp(imageUrl: string): Promise<string> {
-  checkSecrets();
-
-  // Fetch the image from Supabase Storage
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) throw new Error(`Failed to fetch image from storage: HTTP ${imgRes.status}`);
-  const blob = await imgRes.blob();
-  const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
-
-  // Upload to WhatsApp Media endpoint using multipart/form-data
-  const formData = new FormData();
-  formData.append("messaging_product", "whatsapp");
-  formData.append("file", blob, "profile.jpg");
-  formData.append("type", contentType);
-
-  const uploadRes = await fetch(`${WA_API}/${PHONE_NUMBER_ID}/media`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-    },
-    body: formData,
-  });
-
-  const uploadData = await uploadRes.json();
-  if (!uploadRes.ok) {
-    throw new Error(
-      `WhatsApp Media Upload: ${uploadData?.error?.message ?? `HTTP ${uploadRes.status}`}`
-    );
+// ── Resumable Upload to get profile_picture_handle ──────────────────────────
+async function getProfilePictureHandle(imageUrl: string): Promise<string> {
+  if (!APP_ID) {
+    throw new Error("APP_ID is required in secrets for profile picture upload.");
   }
 
-  return uploadData.id as string; // media_id
+  // 1. Fetch image from Supabase Storage
+  const imgRes = await fetch(imageUrl);
+  if (!imgRes.ok) throw new Error(`Failed to fetch image: HTTP ${imgRes.status}`);
+  const blob = await imgRes.blob();
+  const fileLength = blob.size;
+  const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+
+  // 2. Create resumable upload session
+  const sessionRes = await fetch(
+    `${WA_API}/${APP_ID}/uploads?access_token=${ACCESS_TOKEN}&file_length=${fileLength}&file_type=${encodeURIComponent(contentType)}`,
+    { method: "POST" }
+  );
+  const sessionData = await sessionRes.json();
+  if (!sessionRes.ok) {
+    throw new Error(`Upload session failed: ${sessionData?.error?.message ?? `HTTP ${sessionRes.status}`}`);
+  }
+  const sessionId = sessionData.id; // e.g. "upload:XXXXX?sig=XXXXX"
+  console.log("[profile] Upload session:", sessionId);
+
+  // 3. Upload file bytes to session
+  const uploadRes = await fetch(`${WA_API}/${sessionId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${ACCESS_TOKEN}`,
+      "file_offset": "0",
+      "Content-Type": "multipart/form-data", // Let browser/Deno set boundary
+    },
+    body: blob,
+  });
+  const uploadData = await uploadRes.json();
+  if (!uploadRes.ok) {
+    throw new Error(`Upload failed: ${uploadData?.error?.message ?? `HTTP ${uploadRes.status}`}`);
+  }
+  const handle = uploadData.h; // The profile_picture_handle, e.g. "4::XXX==:XXXXXX"
+  console.log("[profile] Got handle:", handle);
+
+  if (!handle) {
+    throw new Error("No handle returned from resumable upload.");
+  }
+  return handle;
 }
 
 // ── Update WhatsApp Business profile ───────────────────────────────────────
@@ -107,21 +121,28 @@ async function updateBotProfile(options: {
 }) {
   checkSecrets();
 
-  // Upload photo and get media handle if provided
   let profilePictureHandle: string | undefined;
   if (options.photoUrl) {
-    console.log("[profile] Uploading profile photo to WhatsApp Media API...");
-    profilePictureHandle = await uploadMediaToWhatsApp(options.photoUrl);
-    console.log("[profile] Got media_id:", profilePictureHandle);
+    console.log("[profile] Starting resumable upload for profile photo...");
+    profilePictureHandle = await getProfilePictureHandle(options.photoUrl);
   }
 
-  // Build profile update payload — messaging_product is required by the API
-  const payload: Record<string, unknown> = { messaging_product: "whatsapp" };
-  if (options.about && options.about.trim()) payload.about = options.about.trim().slice(0, 139);
-  if (profilePictureHandle) payload.profile_picture_handle = profilePictureHandle;
-  // Note: display name update requires a separate name change request with Meta approval
+  // Build payload — ONLY include fields that have values
+  const payload: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+  };
 
-  if (Object.keys(payload).length === 0) {
+  if (options.about && options.about.trim()) {
+    payload.about = options.about.trim().slice(0, 139);
+  }
+
+  if (profilePictureHandle) {
+    payload.profile_picture_handle = profilePictureHandle;
+  }
+
+  // Validate: we need at least something to update
+  const hasUpdates = Object.keys(payload).length > 1; // >1 because messaging_product is always there
+  if (!hasUpdates) {
     throw new Error("No valid profile fields to update (about or photo required)");
   }
 
@@ -140,7 +161,7 @@ async function updateBotProfile(options: {
   const profileData = await profileRes.json();
   if (!profileRes.ok) {
     throw new Error(
-      `WhatsApp Profile API: ${profileData?.error?.message ?? `HTTP ${profileRes.status}`}`
+      `WhatsApp Profile API: ${profileData?.error?.message ?? `HTTP ${profileRes.status}`} — ${JSON.stringify(profileData)}`
     );
   }
 
