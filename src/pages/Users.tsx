@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { formatRelativeTime, formatDate, maskPhone } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
   Search, Users, ShieldOff, Shield, Brain, Gauge,
-  RefreshCw, Circle, Loader2, Edit3, Check, X
+  RefreshCw, Circle, Edit3, Check, X
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +29,37 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const LANG_LABELS: Record<string, string> = { en: "🇺🇸 EN", fr: "🇫🇷 FR", ht: "🇭🇹 HT" };
+
+function safeDate(val: string | null | undefined): Date | null {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function formatRelativeTime(val: string | null | undefined): string {
+  const d = safeDate(val);
+  if (!d) return "—";
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatDate(val: string | null | undefined): string {
+  const d = safeDate(val);
+  if (!d) return "—";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function maskPhone(phone: string): string {
+  if (phone.length <= 4) return phone;
+  return phone.slice(0, -4).replace(/./g, "•") + phone.slice(-4);
+}
 
 function RateLimitBar({ value, max = 50 }: { value: number; max?: number }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
@@ -83,7 +113,6 @@ export default function UsersPage() {
       toast.success(newStatus === "blocked" ? `Blocked ${user.name ?? user.phone}` : `Unblocked ${user.name ?? user.phone}`);
       fetchUsers();
     }
-    // Also update conversations table
     await supabase.from("conversations").update({ is_blocked: newStatus === "blocked" }).eq("phone", user.phone);
   };
 
@@ -266,7 +295,9 @@ export default function UsersPage() {
                     </td>
                     {/* Language */}
                     <td className="px-4 py-3">
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">{LANG_LABELS[user.language] ?? user.language?.toUpperCase() ?? "EN"}</span>
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                        {LANG_LABELS[user.language] ?? user.language?.toUpperCase() ?? "EN"}
+                      </span>
                     </td>
                     {/* Rate Limit */}
                     <td className="px-4 py-3 min-w-[140px]">
@@ -328,7 +359,9 @@ export default function UsersPage() {
                     </td>
                     {/* Last Seen */}
                     <td className="px-4 py-3">
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap font-mono">{formatRelativeTime(user.last_seen)}</span>
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap font-mono">
+                        {formatRelativeTime(user.last_seen)}
+                      </span>
                     </td>
                     {/* Actions */}
                     <td className="px-4 py-3">
@@ -355,11 +388,3 @@ export default function UsersPage() {
     </div>
   );
 }
-remove all demo add new and Uncaught TypeError: date.getTime is not a function Dismiss
-Fix now
-Runtime Error
-File:
-https://9b6tf3.onspace.meme/node_modules/.vite/deps/chunk-6BKLQ22S.js?v=b9dc4992
-First occurred:
-2026-04-27 03:07:30
-TypeError: date.getTime is not a function
