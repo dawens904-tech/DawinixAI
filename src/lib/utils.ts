@@ -29,3 +29,5 @@ export function maskPhone(phone: string): string {
 export function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
+
+please fix thi error Uncaught TypeError: date.getTime is not a function Dismiss.
