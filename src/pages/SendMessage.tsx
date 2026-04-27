@@ -413,3 +413,4 @@ export default function SendMessage() {
     </div>
   );
 }
+Uncaught TypeError: date.getTime is not a function Dismiss
