@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import {
   Send, Phone, MessageSquare, CheckCircle, XCircle,
-  Loader2, History, User, Settings, RefreshCw, Bot, AlertTriangle
+  Loader2, History, User, Settings, RefreshCw, Bot,
+  AlertTriangle, Upload, Camera, X, Image
 } from "lucide-react";
 import { toast } from "sonner";
 import { FunctionsHttpError } from "@supabase/supabase-js";
@@ -33,7 +34,12 @@ export default function SendMessage() {
   // Profile state
   const [profileName, setProfileName] = useState("");
   const [profileAbout, setProfileAbout] = useState("");
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase
@@ -46,11 +52,12 @@ export default function SendMessage() {
     supabase
       .from("bot_config")
       .select("key, value")
-      .in("key", ["bot_name", "bot_about"])
+      .in("key", ["bot_name", "bot_about", "bot_photo_url"])
       .then(({ data }) => {
         if (data) {
           const nameRow = data.find((r) => r.key === "bot_name");
           const aboutRow = data.find((r) => r.key === "bot_about");
+          const photoRow = data.find((r) => r.key === "bot_photo_url");
           if (nameRow)
             setProfileName(
               typeof nameRow.value === "string"
@@ -63,10 +70,71 @@ export default function SendMessage() {
                 ? aboutRow.value.replace(/^"|"$/g, "")
                 : String(aboutRow.value)
             );
+          if (photoRow) {
+            const url =
+              typeof photoRow.value === "string"
+                ? photoRow.value.replace(/^"|"$/g, "")
+                : String(photoRow.value);
+            setProfilePhotoUrl(url);
+            setPhotoPreview(url);
+          }
         }
       });
   }, []);
 
+  // ── Upload photo to Supabase Storage ─────────────────────────────────────
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (JPG, PNG, WebP)");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5 MB");
+      return;
+    }
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadPhoto = async (): Promise<string | null> => {
+    if (!photoFile) return profilePhotoUrl;
+    setUploadingPhoto(true);
+    const ext = photoFile.name.split(".").pop() ?? "jpg";
+    const fileName = `bot-profile/${Date.now()}.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("generated-images")
+      .upload(fileName, photoFile, {
+        contentType: photoFile.type,
+        upsert: true,
+      });
+
+    if (upErr) {
+      toast.error(`Photo upload failed: ${upErr.message}`);
+      setUploadingPhoto(false);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("generated-images")
+      .getPublicUrl(fileName);
+
+    // Persist URL in bot_config
+    await supabase.from("bot_config").upsert(
+      { key: "bot_photo_url", value: JSON.stringify(publicUrl), updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+
+    setProfilePhotoUrl(publicUrl);
+    setUploadingPhoto(false);
+    return publicUrl;
+  };
+
+  // ── Send message ──────────────────────────────────────────────────────────
   const handleSend = async () => {
     const cleanPhone = phone.replace(/\D/g, "");
     if (!cleanPhone || cleanPhone.length < 7) {
@@ -81,86 +149,60 @@ export default function SendMessage() {
     setSending(true);
     const { data, error } = await supabase.functions.invoke(
       "send-whatsapp-message",
-      {
-        body: { action: "send", to: cleanPhone, message: message.trim() },
-      }
+      { body: { action: "send", to: cleanPhone, message: message.trim() } }
     );
 
     if (error) {
       let errMsg = error.message;
       if (error instanceof FunctionsHttpError) {
-        try {
-          errMsg = (await error.context?.text()) || errMsg;
-        } catch {
-          /* noop */
-        }
+        try { errMsg = (await error.context?.text()) || errMsg; } catch { /* noop */ }
       }
       toast.error(`Failed: ${errMsg}`);
-      setLog((prev) => [
-        {
-          phone: cleanPhone,
-          message,
-          status: "error",
-          error: errMsg,
-          timestamp: new Date(),
-        },
-        ...prev,
-      ]);
+      setLog((prev) => [{ phone: cleanPhone, message, status: "error", error: errMsg, timestamp: new Date() }, ...prev]);
     } else if (data?.error) {
       toast.error(`WhatsApp error: ${data.error}`);
-      setLog((prev) => [
-        {
-          phone: cleanPhone,
-          message,
-          status: "error",
-          error: data.error,
-          timestamp: new Date(),
-        },
-        ...prev,
-      ]);
+      setLog((prev) => [{ phone: cleanPhone, message, status: "error", error: data.error, timestamp: new Date() }, ...prev]);
     } else {
       toast.success(`Message sent to +${cleanPhone}`);
-      setLog((prev) => [
-        { phone: cleanPhone, message, status: "success", timestamp: new Date() },
-        ...prev,
-      ]);
+      setLog((prev) => [{ phone: cleanPhone, message, status: "success", timestamp: new Date() }, ...prev]);
       setMessage("");
       setCharCount(0);
     }
     setSending(false);
   };
 
+  // ── Save profile (name + about + photo) ──────────────────────────────────
   const handleSaveProfile = async () => {
-    if (!profileName.trim() && !profileAbout.trim()) {
-      toast.error("Enter at least a name or about text");
+    if (!profileName.trim() && !profileAbout.trim() && !photoFile) {
+      toast.error("Enter at least a name, about text, or select a photo");
       return;
     }
     setSavingProfile(true);
-    const { data, error } = await supabase.functions.invoke(
-      "send-whatsapp-message",
-      {
-        body: {
-          action: "update_profile",
-          profile_name: profileName.trim() || undefined,
-          profile_about: profileAbout.trim() || undefined,
-        },
-      }
-    );
+
+    // 1. Upload photo first if selected
+    const photoUrl = await handleUploadPhoto();
+
+    // 2. Call edge function to update WhatsApp profile
+    const { data, error } = await supabase.functions.invoke("send-whatsapp-message", {
+      body: {
+        action: "update_profile",
+        profile_name: profileName.trim() || undefined,
+        profile_about: profileAbout.trim() || undefined,
+        profile_photo_url: photoUrl || undefined,
+      },
+    });
 
     if (error) {
       let errMsg = error.message;
       if (error instanceof FunctionsHttpError) {
-        try {
-          errMsg = (await error.context?.text()) || errMsg;
-        } catch {
-          /* noop */
-        }
+        try { errMsg = (await error.context?.text()) || errMsg; } catch { /* noop */ }
       }
       toast.error(`Profile update failed: ${errMsg}`);
     } else if (data?.error) {
       toast.error(`API error: ${data.error}`);
     } else {
       toast.success("Bot profile updated successfully!");
+      setPhotoFile(null);
     }
     setSavingProfile(false);
   };
@@ -178,7 +220,7 @@ export default function SendMessage() {
         <div>
           <h2 className="text-lg font-bold text-foreground">Send Message</h2>
           <p className="text-xs text-muted-foreground">
-            Send real WhatsApp messages directly & manage bot profile
+            Send real WhatsApp messages &amp; manage bot profile
           </p>
         </div>
       </div>
@@ -205,51 +247,35 @@ export default function SendMessage() {
         ))}
       </div>
 
+      {/* ── SEND TAB ── */}
       {tab === "send" && (
         <div className="space-y-4">
-          {/* #131030 Test-mode warning banner */}
+          {/* #131030 Test-mode warning */}
           <div className="rounded-xl bg-yellow-400/5 border border-yellow-400/30 p-4 flex items-start gap-3">
             <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
             <div className="text-[11px] space-y-1.5">
               <p className="font-semibold text-yellow-400 text-xs">
-                Error #131030 — WhatsApp Test Mode: Recipient Not in Allowed
-                List
+                Error #131030 — WhatsApp Test Mode: Recipient Not in Allowed List
               </p>
               <p className="text-muted-foreground">
                 Your Meta app is in{" "}
-                <strong className="text-foreground">Development mode</strong>.
-                Only pre-verified numbers can receive messages. To fix:
+                <strong className="text-foreground">Development mode</strong>. Only pre-verified
+                numbers can receive messages. To fix:
               </p>
               <ol className="list-decimal list-inside space-y-1 text-muted-foreground pl-1">
                 <li>
-                  Go to{" "}
-                  <strong className="text-foreground">
-                    Meta Developer Console
-                  </strong>{" "}
-                  → your app →{" "}
-                  <strong className="text-foreground">
-                    WhatsApp → API Setup
-                  </strong>
+                  Go to <strong className="text-foreground">Meta Developer Console</strong> → your
+                  app → <strong className="text-foreground">WhatsApp → API Setup</strong>
                 </li>
                 <li>
-                  Under the{" "}
-                  <strong className="text-foreground">"To"</strong> field,
-                  click{" "}
-                  <strong className="text-foreground">
-                    "Manage phone number list"
-                  </strong>
+                  Under <strong className="text-foreground">"To"</strong>, click{" "}
+                  <strong className="text-foreground">"Manage phone number list"</strong>
                 </li>
+                <li>Add the recipient number and verify with OTP sent by WhatsApp</li>
                 <li>
-                  Add the recipient number and verify it with the OTP sent by
-                  WhatsApp
-                </li>
-                <li>
-                  <strong className="text-foreground">Or go live:</strong>{" "}
-                  complete{" "}
-                  <strong className="text-foreground">
-                    Meta Business Verification
-                  </strong>{" "}
-                  to remove all number restrictions permanently
+                  <strong className="text-foreground">Or go live:</strong> complete{" "}
+                  <strong className="text-foreground">Meta Business Verification</strong> to remove
+                  all restrictions
                 </li>
               </ol>
             </div>
@@ -279,8 +305,7 @@ export default function SendMessage() {
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Include country code, no spaces or + symbol. E.g.
-                    18573917861
+                    Include country code, no spaces or + symbol. E.g. 18573917861
                   </p>
                 </div>
 
@@ -319,9 +344,7 @@ export default function SendMessage() {
                     <span
                       className={cn(
                         "text-[10px] font-mono",
-                        charCount > 4000
-                          ? "text-destructive"
-                          : "text-muted-foreground"
+                        charCount > 4000 ? "text-destructive" : "text-muted-foreground"
                       )}
                     >
                       {charCount}/4096
@@ -329,19 +352,13 @@ export default function SendMessage() {
                   </div>
                   <textarea
                     value={message}
-                    onChange={(e) => {
-                      setMessage(e.target.value);
-                      setCharCount(e.target.value.length);
-                    }}
+                    onChange={(e) => { setMessage(e.target.value); setCharCount(e.target.value.length); }}
                     rows={5}
                     className={cn(inputClass, "resize-none leading-relaxed")}
-                    placeholder={
-                      "Type your message here...\n\nSupports WhatsApp formatting:\n*bold*, _italic_, ~strikethrough~, `code`"
-                    }
+                    placeholder={"Type your message here...\n\nSupports WhatsApp formatting:\n*bold*, _italic_, ~strikethrough~, `code`"}
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Supports WhatsApp formatting: *bold*, _italic_,
-                    ~strikethrough~, {"`"}monospace{"`"}
+                    Supports WhatsApp formatting: *bold*, _italic_, ~strikethrough~, {"`"}monospace{"`"}
                   </p>
                 </div>
 
@@ -352,25 +369,13 @@ export default function SendMessage() {
                   </label>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      {
-                        label: "Welcome",
-                        text: "👋 Welcome to *Dawinix AI*! Type /start to begin or just ask me anything. 🚀",
-                      },
-                      {
-                        label: "Reminder",
-                        text: "🔔 *Reminder from Dawinix AI*\n\nDon't forget — I'm here 24/7 to help! Just send a message anytime. 💬",
-                      },
-                      {
-                        label: "Update",
-                        text: "🆕 *Bot Update*\n\nWe've added new features! Type /help to see all available commands. 🎉",
-                      },
+                      { label: "Welcome", text: "👋 Welcome to *Dawinix AI*! Type /start to begin or just ask me anything. 🚀" },
+                      { label: "Reminder", text: "🔔 *Reminder from Dawinix AI*\n\nDon't forget — I'm here 24/7 to help! Just send a message anytime. 💬" },
+                      { label: "Update", text: "🆕 *Bot Update*\n\nWe've added new features! Type /help to see all available commands. 🎉" },
                     ].map(({ label, text }) => (
                       <button
                         key={label}
-                        onClick={() => {
-                          setMessage(text);
-                          setCharCount(text.length);
-                        }}
+                        onClick={() => { setMessage(text); setCharCount(text.length); }}
                         className="px-2.5 py-1 rounded-lg bg-secondary border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/20 transition-all"
                       >
                         {label}
@@ -384,11 +389,7 @@ export default function SendMessage() {
                   disabled={sending || !phone.trim() || !message.trim()}
                   className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 transition-all"
                 >
-                  {sending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   {sending ? "Sending..." : "Send WhatsApp Message"}
                 </button>
               </div>
@@ -407,9 +408,7 @@ export default function SendMessage() {
                   {log.length === 0 ? (
                     <div className="text-center py-10">
                       <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-xs text-muted-foreground">
-                        No messages sent yet
-                      </p>
+                      <p className="text-xs text-muted-foreground">No messages sent yet</p>
                     </div>
                   ) : (
                     log.map((entry, i) => (
@@ -428,20 +427,16 @@ export default function SendMessage() {
                           ) : (
                             <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
                           )}
-                          <span className="font-mono text-muted-foreground">
-                            +{entry.phone}
-                          </span>
+                          <span className="font-mono text-muted-foreground">+{entry.phone}</span>
                           <span className="ml-auto text-[10px] text-muted-foreground font-mono">
-                            {entry.timestamp.toLocaleTimeString("en-US", {
-                              hour12: false,
-                            })}
+                            {entry.timestamp.toLocaleTimeString("en-US", { hour12: false })}
                           </span>
                         </div>
                         <p className="text-muted-foreground line-clamp-2 leading-relaxed">
                           {entry.message}
                         </p>
                         {entry.error && (
-                          <p className="text-destructive text-[10px] mt-1 font-mono">
+                          <p className="text-destructive text-[10px] mt-1 font-mono break-all">
                             {entry.error}
                           </p>
                         )}
@@ -455,23 +450,78 @@ export default function SendMessage() {
         </div>
       )}
 
+      {/* ── PROFILE TAB ── */}
       {tab === "profile" && (
-        <div className="max-w-lg">
-          <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center">
-                <Bot className="w-7 h-7 text-primary" />
+        <div className="max-w-lg space-y-4">
+          <div className="rounded-2xl bg-card border border-border p-5 space-y-5">
+            {/* Photo upload */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-primary/10 border-2 border-primary/30 flex items-center justify-center">
+                  {photoPreview ? (
+                    <img
+                      src={photoPreview}
+                      alt="Bot profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Bot className="w-10 h-10 text-primary" />
+                  )}
+                </div>
+                {/* Camera overlay button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-all border-2 border-card"
+                  title="Change profile photo"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+                {/* Clear photo button */}
+                {photoPreview && (
+                  <button
+                    onClick={() => { setPhotoPreview(null); setPhotoFile(null); }}
+                    className="absolute top-0 right-0 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center shadow-lg hover:bg-destructive/80 transition-all"
+                    title="Remove photo"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-bold text-foreground">
-                  {profileName || "Dawinix AI"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  WhatsApp Business Profile
-                </p>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handlePhotoSelect}
+              />
+
+              <div className="text-center">
+                <p className="text-sm font-bold text-foreground">{profileName || "Dawinix AI"}</p>
+                <p className="text-xs text-muted-foreground">WhatsApp Business Profile</p>
               </div>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {photoFile ? `Selected: ${photoFile.name}` : "Upload Profile Photo"}
+              </button>
+
+              {photoFile && (
+                <div className="flex items-center gap-2 text-[10px] text-primary bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
+                  <Image className="w-3 h-3" />
+                  {photoFile.name} · {(photoFile.size / 1024).toFixed(0)} KB
+                </div>
+              )}
+
+              <p className="text-[10px] text-muted-foreground text-center">
+                JPG, PNG, or WebP · Max 5 MB · Square image recommended
+              </p>
             </div>
 
+            {/* Bot name */}
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1.5">
                 Bot Display Name
@@ -488,6 +538,7 @@ export default function SendMessage() {
               </p>
             </div>
 
+            {/* About */}
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1.5">
                 About / Status
@@ -505,29 +556,32 @@ export default function SendMessage() {
               </p>
             </div>
 
+            {/* Info */}
             <div className="rounded-xl bg-yellow-400/5 border border-yellow-400/20 p-3">
               <div className="flex items-start gap-2">
                 <Settings className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground">
-                  Profile changes are applied to your WhatsApp Business account
-                  via the Cloud API. The name shown in WhatsApp chats depends on
-                  your Business account display name and may require Meta
-                  approval.
+                  Profile photo is uploaded to storage and sent to WhatsApp via the Media API.
+                  Display name changes require Meta Business Verification and may take 24–48 hours to appear.
                 </p>
               </div>
             </div>
 
             <button
               onClick={handleSaveProfile}
-              disabled={savingProfile}
+              disabled={savingProfile || uploadingPhoto}
               className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 transition-all"
             >
-              {savingProfile ? (
+              {(savingProfile || uploadingPhoto) ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <RefreshCw className="w-4 h-4" />
               )}
-              {savingProfile ? "Updating..." : "Update Bot Profile"}
+              {uploadingPhoto
+                ? "Uploading photo..."
+                : savingProfile
+                ? "Updating profile..."
+                : "Save & Apply to WhatsApp"}
             </button>
           </div>
         </div>
@@ -535,12 +589,3 @@ export default function SendMessage() {
     </div>
   );
 }
-please allow i can upload real photo perfile and auto set in whatsapp number even the about to and fix error {
-  "eventMessage": "POST | 500 | http://zmkdygoyejtywrftzmkd.backend.onspace.ai/functions/v1/send-whatsapp-message | Internal Server Error",
-  "functionId": "send-whatsapp-message",
-  "id": "504361ee-f1b0-48fc-9aaa-7ade88e7da3f",
-  "logLevel": "ERROR",
-  "method": "POST",
-  "statusCode": 500,
-  "timestamp": 1777274844
-} please make sure all set success.
