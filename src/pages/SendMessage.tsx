@@ -413,3 +413,12 @@ export default function SendMessage() {
     </div>
   );
 }
+fix {"error":"Authentication Error"} {
+  "eventMessage": "POST | 500 | http://zmkdygoyejtywrftzmkd.backend.onspace.ai/functions/v1/send-whatsapp-message | Internal Server Error",
+  "functionId": "send-whatsapp-message",
+  "id": "c632ae5a-bd09-47b4-a2ba-bf1caa206ee3",
+  "logLevel": "ERROR",
+  "method": "POST",
+  "statusCode": 500,
+  "timestamp": 1777274409
+}.
