@@ -595,4 +595,4 @@ export default function SendMessage() {
     </div>
   );
 }
-
+fix Profile update failed: {"error":"WhatsApp Profile API: An unknown error occurred — {\"error\":{\"message\":\"An unknown error occurred\",\"type\":\"OAuthException\",\"code\":1,\"error_subcode\":3441012,\"is_transient\":false,\"error_user_title\":\"Image type not supported\",\"error_user_msg\":\"Please upload JPG image.\",\"fbtrace_id\":\"AxCxx9s602Uzmm1UJZnzilC\"}}"}.
