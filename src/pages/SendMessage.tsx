@@ -560,10 +560,16 @@ export default function SendMessage() {
             <div className="rounded-xl bg-yellow-400/5 border border-yellow-400/20 p-3">
               <div className="flex items-start gap-2">
                 <Settings className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-muted-foreground">
-                  Profile photo is uploaded to storage and sent to WhatsApp via the Media API.
-                  Display name changes require Meta Business Verification and may take 24–48 hours to appear.
-                </p>
+                <div className="text-[11px] text-muted-foreground space-y-1.5">
+                  <p>Profile photo is uploaded to storage and sent to WhatsApp via the Media API.</p>
+                  <p className="font-semibold text-yellow-400">OAuthException (code 1) fix:</p>
+                  <ol className="list-decimal list-inside space-y-1 pl-1">
+                    <li>Your <strong className="text-foreground">System User token</strong> must have <strong className="text-foreground">whatsapp_business_management</strong> permission</li>
+                    <li>Go to <strong className="text-foreground">Meta Business Suite → Settings → System Users</strong>, edit the user and add that permission</li>
+                    <li>Regenerate the access token and update <strong className="text-foreground">ACCESS_TOKEN</strong> in OnSpace Cloud → Secrets</li>
+                    <li>Display name changes require Meta Business Verification (24–48 hrs)</li>
+                  </ol>
+                </div>
               </div>
             </div>
 
@@ -590,10 +596,4 @@ export default function SendMessage() {
   );
 }
 
-please fix {
-  "eventMessage": "[update_profile] Error: WhatsApp Profile API: An unknown error has occurred. — {\"error\":{\"message\":\"An unknown error has occurred.\",\"type\":\"OAuthException\",\"code\":1,\"fbtrace_id\":\"A-4-uUO4YiE-ASXUCcQAU2_\"}}\n",
-  "functionId": "send-whatsapp-message",
-  "id": "a396161e-c3d8-4a19-a92d-27a4ce3220e4",
-  "logLevel": "ERROR",
-  "timestamp": 1777321434
-}.
+
