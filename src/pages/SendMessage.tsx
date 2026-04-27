@@ -590,4 +590,10 @@ export default function SendMessage() {
   );
 }
 
-
+please fix {
+  "eventMessage": "[update_profile] Error: WhatsApp Profile API: An unknown error has occurred. — {\"error\":{\"message\":\"An unknown error has occurred.\",\"type\":\"OAuthException\",\"code\":1,\"fbtrace_id\":\"A-4-uUO4YiE-ASXUCcQAU2_\"}}\n",
+  "functionId": "send-whatsapp-message",
+  "id": "a396161e-c3d8-4a19-a92d-27a4ce3220e4",
+  "logLevel": "ERROR",
+  "timestamp": 1777321434
+}.
