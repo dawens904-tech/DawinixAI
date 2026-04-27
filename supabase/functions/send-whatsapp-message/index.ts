@@ -114,8 +114,10 @@ async function getProfilePictureHandle(imageUrl: string): Promise<string> {
   // 1. Fetch image from Supabase Storage
   const imgRes = await fetch(imageUrl);
   if (!imgRes.ok) throw new Error(`Failed to fetch image: HTTP ${imgRes.status}`);
-  const blob = await imgRes.blob();
-  const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+  const arrayBuffer = await imgRes.arrayBuffer();
+  // WhatsApp ONLY accepts image/jpeg — force it regardless of source format
+  const contentType = "image/jpeg";
+  const blob = new Blob([arrayBuffer], { type: contentType });
 
   // 2. Create session
   const sessionId = await createUploadSession(blob.size, contentType);

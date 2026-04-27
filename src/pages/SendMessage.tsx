@@ -94,6 +94,10 @@ export default function SendMessage() {
       toast.error("Image must be under 5 MB");
       return;
     }
+    if (!file.type.includes("jpeg") && !file.name.toLowerCase().endsWith(".jpg")) {
+      toast.error("WhatsApp profile photos must be JPG/JPEG format only");
+      return;
+    }
     setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
@@ -491,7 +495,7 @@ export default function SendMessage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,.jpg"
                 className="hidden"
                 onChange={handlePhotoSelect}
               />
@@ -506,7 +510,7 @@ export default function SendMessage() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
               >
                 <Upload className="w-3.5 h-3.5" />
-                {photoFile ? `Selected: ${photoFile.name}` : "Upload Profile Photo"}
+                {photoFile ? `Selected: ${photoFile.name}` : "Upload Profile Photo (JPG only)"}
               </button>
 
               {photoFile && (
@@ -517,7 +521,7 @@ export default function SendMessage() {
               )}
 
               <p className="text-[10px] text-muted-foreground text-center">
-                JPG, PNG, or WebP · Max 5 MB · Square image recommended
+                JPG/JPEG only (WhatsApp requirement) · Max 5 MB · Square image recommended
               </p>
             </div>
 
@@ -595,4 +599,4 @@ export default function SendMessage() {
     </div>
   );
 }
-fix Profile update failed: {"error":"WhatsApp Profile API: An unknown error occurred — {\"error\":{\"message\":\"An unknown error occurred\",\"type\":\"OAuthException\",\"code\":1,\"error_subcode\":3441012,\"is_transient\":false,\"error_user_title\":\"Image type not supported\",\"error_user_msg\":\"Please upload JPG image.\",\"fbtrace_id\":\"AxCxx9s602Uzmm1UJZnzilC\"}}"}.
+
