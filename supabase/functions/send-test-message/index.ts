@@ -106,8 +106,45 @@ serve(async (req) => {
       reply = `💻 *Code Generated:*\n\n${data.choices?.[0]?.message?.content ?? "Error generating code"}`;
       processingDetail = `OnSpace AI (${aiModel}) generated code response`;
     } else if (lower.startsWith("/image ")) {
-      reply = `🎨 Image generation is available in production mode. The full deployment uses DALL·E 3 to generate images from your prompt: "${message.slice(7)}"`;
-      processingDetail = "Image generation placeholder (use full deployment for real images)";
+      const imgPrompt = message.slice(7);
+      aiModel = "google/gemini-2.5-flash-image";
+      try {
+        const imgRes = await fetch(`${AI_BASE_URL}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${AI_API_KEY}` },
+          body: JSON.stringify({
+            model: aiModel,
+            modalities: ["image", "text"],
+            messages: [{ role: "user", content: imgPrompt }],
+            image_config: { aspect_ratio: "1:1", image_size: "1K" },
+          }),
+        });
+        const imgData = await imgRes.json();
+        const imageDataUrl: string = imgData.choices?.[0]?.message?.images?.[0]?.image_url?.url ?? "";
+        if (imageDataUrl) {
+          // Upload to storage
+          const base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
+          const binaryStr = atob(base64);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+          const blob = new Blob([bytes], { type: "image/png" });
+          const fileName = `simulator/${crypto.randomUUID()}.png`;
+          const { error: uploadErr } = await supabase.storage.from("generated-images").upload(fileName, blob, { contentType: "image/png", upsert: false });
+          if (!uploadErr) {
+            const { data: { publicUrl } } = supabase.storage.from("generated-images").getPublicUrl(fileName);
+            reply = `🎨 *AI Image Generated!*\n\n📎 ${publicUrl}\n\n_Prompt: "${imgPrompt}"_`;
+          } else {
+            reply = `🎨 Image generated but upload failed: ${uploadErr.message}`;
+          }
+        } else {
+          reply = `🎨 Image generation returned no data. Try a different prompt.`;
+        }
+        processingDetail = `OnSpace AI (${aiModel}) generated image`;
+      } catch (imgErr) {
+        reply = `❌ Image generation error: ${imgErr instanceof Error ? imgErr.message : String(imgErr)}`;
+        processingDetail = `Image generation failed`;
+        processingStatus = "error";
+      }
     } else {
       // Check custom commands
       const customReply = await checkCustomCommand(message);
