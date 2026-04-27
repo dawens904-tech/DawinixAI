@@ -9,6 +9,9 @@ const ROUTE_LABELS: Record<string, string> = {
   "/users": "User Management",
   "/analytics": "Analytics",
   "/config": "Bot Configuration",
+  "/commands": "Command Builder",
+  "/simulator": "Webhook Simulator",
+  "/logs": "System Logs",
   "/setup": "Setup Guide",
 };
 

@@ -54,6 +54,9 @@ export default {
           blue: "#00ccff",
           purple: "#aa88ff",
         },
+        "neon-blue": "#00ccff",
+        "neon-purple": "#aa88ff",
+        "neon-green": "#00ff88",
         dark: {
           900: "#050810",
           800: "#080d18",

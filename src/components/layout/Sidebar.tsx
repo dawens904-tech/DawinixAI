@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, MessageSquare, Users, Settings,
-  BarChart3, BookOpen, X, Zap, Circle
+  BarChart3, BookOpen, X, Zap, Circle, Terminal, FlaskConical, Wrench
 } from "lucide-react";
 
 interface SidebarProps {
@@ -10,29 +10,49 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-const NAV_ITEMS = [
+const MAIN_NAV = [
   { label: "Overview", path: "/", icon: LayoutDashboard },
   { label: "Conversations", path: "/conversations", icon: MessageSquare },
   { label: "Users", path: "/users", icon: Users },
   { label: "Analytics", path: "/analytics", icon: BarChart3 },
+];
+
+const TOOLS_NAV = [
   { label: "Bot Config", path: "/config", icon: Settings },
+  { label: "Command Builder", path: "/commands", icon: Wrench },
+  { label: "Simulator", path: "/simulator", icon: FlaskConical },
+  { label: "System Logs", path: "/logs", icon: Terminal },
   { label: "Setup Guide", path: "/setup", icon: BookOpen },
 ];
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
+function NavItem({ label, path, icon: Icon, onClose }: { label: string; path: string; icon: React.ElementType; onClose: () => void }) {
   const location = useLocation();
+  const isActive = location.pathname === path;
+  return (
+    <NavLink
+      to={path}
+      onClick={onClose}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+        isActive
+          ? "bg-primary/10 text-primary border border-primary/20 glow-green"
+          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+      )}
+    >
+      <Icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary" : "")} />
+      {label}
+      {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />}
+    </NavLink>
+  );
+}
 
+export default function Sidebar({ open, onClose }: SidebarProps) {
   return (
     <>
-      {/* Overlay */}
       {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={onClose} />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed lg:relative z-50 h-full flex flex-col transition-transform duration-300",
@@ -64,9 +84,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         {/* Bot Status */}
         <div className="mx-4 mt-4 mb-2 px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
           <div className="flex items-center gap-2.5">
-            <div className="relative">
-              <Circle className="w-2.5 h-2.5 fill-primary text-primary pulse-dot" />
-            </div>
+            <Circle className="w-2.5 h-2.5 fill-primary text-primary pulse-dot" />
             <div>
               <p className="text-xs font-semibold text-primary">Bot Online</p>
               <p className="text-[10px] text-muted-foreground font-mono">Webhook Active</p>
@@ -79,31 +97,19 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto scrollbar-thin">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-3 py-2 mt-2">
-            Navigation
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-3 py-2 mt-1">
+            Dashboard
           </p>
-          {NAV_ITEMS.map(({ label, path, icon: Icon }) => {
-            const isActive = location.pathname === path;
-            return (
-              <NavLink
-                key={path}
-                to={path}
-                onClick={onClose}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
-                  isActive
-                    ? "bg-primary/10 text-primary border border-primary/20 glow-green"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                )}
-              >
-                <Icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary" : "")} />
-                {label}
-                {isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                )}
-              </NavLink>
-            );
-          })}
+          {MAIN_NAV.map((item) => (
+            <NavItem key={item.path} {...item} onClose={onClose} />
+          ))}
+
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-3 py-2 mt-3">
+            Tools
+          </p>
+          {TOOLS_NAV.map((item) => (
+            <NavItem key={item.path} {...item} onClose={onClose} />
+          ))}
         </nav>
 
         {/* Footer */}
@@ -114,7 +120,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground truncate">Admin Panel</p>
-              <p className="text-[10px] text-muted-foreground">v1.0.0 · Dawinix AI</p>
+              <p className="text-[10px] text-muted-foreground">v2.0.0 · Dawinix AI</p>
             </div>
           </div>
         </div>

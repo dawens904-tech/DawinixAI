@@ -8,6 +8,9 @@ import Users from "@/pages/Users";
 import BotConfig from "@/pages/BotConfig";
 import Analytics from "@/pages/Analytics";
 import SetupGuide from "@/pages/SetupGuide";
+import SystemLogs from "@/pages/SystemLogs";
+import WebhookSimulator from "@/pages/WebhookSimulator";
+import CommandBuilder from "@/pages/CommandBuilder";
 import NotFound from "@/pages/NotFound";
 import { useState } from "react";
 
@@ -28,6 +31,9 @@ export default function App() {
               <Route path="/config" element={<BotConfig />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/setup" element={<SetupGuide />} />
+              <Route path="/logs" element={<SystemLogs />} />
+              <Route path="/simulator" element={<WebhookSimulator />} />
+              <Route path="/commands" element={<CommandBuilder />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
