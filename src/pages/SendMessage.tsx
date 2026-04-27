@@ -51,8 +51,18 @@ export default function SendMessage() {
         if (data) {
           const nameRow = data.find((r) => r.key === "bot_name");
           const aboutRow = data.find((r) => r.key === "bot_about");
-          if (nameRow) setProfileName(typeof nameRow.value === "string" ? nameRow.value.replace(/^"|"$/g, "") : String(nameRow.value));
-          if (aboutRow) setProfileAbout(typeof aboutRow.value === "string" ? aboutRow.value.replace(/^"|"$/g, "") : String(aboutRow.value));
+          if (nameRow)
+            setProfileName(
+              typeof nameRow.value === "string"
+                ? nameRow.value.replace(/^"|"$/g, "")
+                : String(nameRow.value)
+            );
+          if (aboutRow)
+            setProfileAbout(
+              typeof aboutRow.value === "string"
+                ? aboutRow.value.replace(/^"|"$/g, "")
+                : String(aboutRow.value)
+            );
         }
       });
   }, []);
@@ -69,23 +79,51 @@ export default function SendMessage() {
     }
 
     setSending(true);
-    const { data, error } = await supabase.functions.invoke("send-whatsapp-message", {
-      body: { action: "send", to: cleanPhone, message: message.trim() },
-    });
+    const { data, error } = await supabase.functions.invoke(
+      "send-whatsapp-message",
+      {
+        body: { action: "send", to: cleanPhone, message: message.trim() },
+      }
+    );
 
     if (error) {
       let errMsg = error.message;
       if (error instanceof FunctionsHttpError) {
-        try { errMsg = await error.context?.text() || errMsg; } catch { /* noop */ }
+        try {
+          errMsg = (await error.context?.text()) || errMsg;
+        } catch {
+          /* noop */
+        }
       }
       toast.error(`Failed: ${errMsg}`);
-      setLog((prev) => [{ phone: cleanPhone, message, status: "error", error: errMsg, timestamp: new Date() }, ...prev]);
+      setLog((prev) => [
+        {
+          phone: cleanPhone,
+          message,
+          status: "error",
+          error: errMsg,
+          timestamp: new Date(),
+        },
+        ...prev,
+      ]);
     } else if (data?.error) {
       toast.error(`WhatsApp error: ${data.error}`);
-      setLog((prev) => [{ phone: cleanPhone, message, status: "error", error: data.error, timestamp: new Date() }, ...prev]);
+      setLog((prev) => [
+        {
+          phone: cleanPhone,
+          message,
+          status: "error",
+          error: data.error,
+          timestamp: new Date(),
+        },
+        ...prev,
+      ]);
     } else {
       toast.success(`Message sent to +${cleanPhone}`);
-      setLog((prev) => [{ phone: cleanPhone, message, status: "success", timestamp: new Date() }, ...prev]);
+      setLog((prev) => [
+        { phone: cleanPhone, message, status: "success", timestamp: new Date() },
+        ...prev,
+      ]);
       setMessage("");
       setCharCount(0);
     }
@@ -98,18 +136,25 @@ export default function SendMessage() {
       return;
     }
     setSavingProfile(true);
-    const { data, error } = await supabase.functions.invoke("send-whatsapp-message", {
-      body: {
-        action: "update_profile",
-        profile_name: profileName.trim() || undefined,
-        profile_about: profileAbout.trim() || undefined,
-      },
-    });
+    const { data, error } = await supabase.functions.invoke(
+      "send-whatsapp-message",
+      {
+        body: {
+          action: "update_profile",
+          profile_name: profileName.trim() || undefined,
+          profile_about: profileAbout.trim() || undefined,
+        },
+      }
+    );
 
     if (error) {
       let errMsg = error.message;
       if (error instanceof FunctionsHttpError) {
-        try { errMsg = await error.context?.text() || errMsg; } catch { /* noop */ }
+        try {
+          errMsg = (await error.context?.text()) || errMsg;
+        } catch {
+          /* noop */
+        }
       }
       toast.error(`Profile update failed: ${errMsg}`);
     } else if (data?.error) {
@@ -120,7 +165,8 @@ export default function SendMessage() {
     setSavingProfile(false);
   };
 
-  const inputClass = "w-full px-3 py-2.5 rounded-xl bg-dark-900 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 transition-colors";
+  const inputClass =
+    "w-full px-3 py-2.5 rounded-xl bg-dark-900 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 transition-colors";
 
   return (
     <div className="p-4 md:p-6 max-w-[900px] mx-auto space-y-5">
@@ -131,7 +177,9 @@ export default function SendMessage() {
         </div>
         <div>
           <h2 className="text-lg font-bold text-foreground">Send Message</h2>
-          <p className="text-xs text-muted-foreground">Send real WhatsApp messages directly & manage bot profile</p>
+          <p className="text-xs text-muted-foreground">
+            Send real WhatsApp messages directly & manage bot profile
+          </p>
         </div>
       </div>
 
@@ -164,27 +212,44 @@ export default function SendMessage() {
             <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
             <div className="text-[11px] space-y-1.5">
               <p className="font-semibold text-yellow-400 text-xs">
-                Error #131030 — WhatsApp Test Mode: Recipient Not in Allowed List
+                Error #131030 — WhatsApp Test Mode: Recipient Not in Allowed
+                List
               </p>
               <p className="text-muted-foreground">
-                Your Meta app is in <strong className="text-foreground">Development mode</strong>. Only pre-verified numbers can receive messages. To send to{" "}
-                <code className="font-mono bg-black/30 px-1 rounded text-primary">+18573917861</code>:
+                Your Meta app is in{" "}
+                <strong className="text-foreground">Development mode</strong>.
+                Only pre-verified numbers can receive messages. To fix:
               </p>
               <ol className="list-decimal list-inside space-y-1 text-muted-foreground pl-1">
                 <li>
-                  Go to <strong className="text-foreground">Meta Developer Console</strong> → your app →{" "}
-                  <strong className="text-foreground">WhatsApp → API Setup</strong>
+                  Go to{" "}
+                  <strong className="text-foreground">
+                    Meta Developer Console
+                  </strong>{" "}
+                  → your app →{" "}
+                  <strong className="text-foreground">
+                    WhatsApp → API Setup
+                  </strong>
                 </li>
                 <li>
-                  Under the <strong className="text-foreground">"To"</strong> field, click{" "}
-                  <strong className="text-foreground">"Manage phone number list"</strong>
+                  Under the{" "}
+                  <strong className="text-foreground">"To"</strong> field,
+                  click{" "}
+                  <strong className="text-foreground">
+                    "Manage phone number list"
+                  </strong>
                 </li>
                 <li>
-                  Add <code className="font-mono bg-black/30 px-1 rounded text-primary">+18573917861</code> and verify it with the OTP sent by WhatsApp
+                  Add the recipient number and verify it with the OTP sent by
+                  WhatsApp
                 </li>
                 <li>
-                  <strong className="text-foreground">Or go live:</strong> complete{" "}
-                  <strong className="text-foreground">Meta Business Verification</strong> to remove all number restrictions permanently
+                  <strong className="text-foreground">Or go live:</strong>{" "}
+                  complete{" "}
+                  <strong className="text-foreground">
+                    Meta Business Verification
+                  </strong>{" "}
+                  to remove all number restrictions permanently
                 </li>
               </ol>
             </div>
@@ -214,7 +279,8 @@ export default function SendMessage() {
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Include country code, no spaces or + symbol. E.g. 18573917861
+                    Include country code, no spaces or + symbol. E.g.
+                    18573917861
                   </p>
                 </div>
 
@@ -250,34 +316,61 @@ export default function SendMessage() {
                     <label className="block text-xs font-semibold text-foreground">
                       Message *
                     </label>
-                    <span className={cn("text-[10px] font-mono", charCount > 4000 ? "text-destructive" : "text-muted-foreground")}>
+                    <span
+                      className={cn(
+                        "text-[10px] font-mono",
+                        charCount > 4000
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                      )}
+                    >
                       {charCount}/4096
                     </span>
                   </div>
                   <textarea
                     value={message}
-                    onChange={(e) => { setMessage(e.target.value); setCharCount(e.target.value.length); }}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      setCharCount(e.target.value.length);
+                    }}
                     rows={5}
                     className={cn(inputClass, "resize-none leading-relaxed")}
-                    placeholder={"Type your message here...\n\nSupports WhatsApp formatting:\n*bold*, _italic_, ~strikethrough~, `code`"}
+                    placeholder={
+                      "Type your message here...\n\nSupports WhatsApp formatting:\n*bold*, _italic_, ~strikethrough~, `code`"
+                    }
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Supports WhatsApp formatting: *bold*, _italic_, ~strikethrough~, {"`"}monospace{"`"}
+                    Supports WhatsApp formatting: *bold*, _italic_,
+                    ~strikethrough~, {"`"}monospace{"`"}
                   </p>
                 </div>
 
                 {/* Quick templates */}
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-2">Quick Templates</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
+                    Quick Templates
+                  </label>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      { label: "Welcome", text: "👋 Welcome to *Dawinix AI*! Type /start to begin or just ask me anything. 🚀" },
-                      { label: "Reminder", text: "🔔 *Reminder from Dawinix AI*\n\nDon't forget — I'm here 24/7 to help! Just send a message anytime. 💬" },
-                      { label: "Update", text: "🆕 *Bot Update*\n\nWe've added new features! Type /help to see all available commands. 🎉" },
+                      {
+                        label: "Welcome",
+                        text: "👋 Welcome to *Dawinix AI*! Type /start to begin or just ask me anything. 🚀",
+                      },
+                      {
+                        label: "Reminder",
+                        text: "🔔 *Reminder from Dawinix AI*\n\nDon't forget — I'm here 24/7 to help! Just send a message anytime. 💬",
+                      },
+                      {
+                        label: "Update",
+                        text: "🆕 *Bot Update*\n\nWe've added new features! Type /help to see all available commands. 🎉",
+                      },
                     ].map(({ label, text }) => (
                       <button
                         key={label}
-                        onClick={() => { setMessage(text); setCharCount(text.length); }}
+                        onClick={() => {
+                          setMessage(text);
+                          setCharCount(text.length);
+                        }}
                         className="px-2.5 py-1 rounded-lg bg-secondary border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/20 transition-all"
                       >
                         {label}
@@ -291,7 +384,11 @@ export default function SendMessage() {
                   disabled={sending || !phone.trim() || !message.trim()}
                   className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 transition-all"
                 >
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {sending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
                   {sending ? "Sending..." : "Send WhatsApp Message"}
                 </button>
               </div>
@@ -310,7 +407,9 @@ export default function SendMessage() {
                   {log.length === 0 ? (
                     <div className="text-center py-10">
                       <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-xs text-muted-foreground">No messages sent yet</p>
+                      <p className="text-xs text-muted-foreground">
+                        No messages sent yet
+                      </p>
                     </div>
                   ) : (
                     log.map((entry, i) => (
@@ -324,19 +423,27 @@ export default function SendMessage() {
                         )}
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          {entry.status === "success"
-                            ? <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />
-                            : <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />}
-                          <span className="font-mono text-muted-foreground">+{entry.phone}</span>
+                          {entry.status === "success" ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                          )}
+                          <span className="font-mono text-muted-foreground">
+                            +{entry.phone}
+                          </span>
                           <span className="ml-auto text-[10px] text-muted-foreground font-mono">
-                            {entry.timestamp.toLocaleTimeString("en-US", { hour12: false })}
+                            {entry.timestamp.toLocaleTimeString("en-US", {
+                              hour12: false,
+                            })}
                           </span>
                         </div>
                         <p className="text-muted-foreground line-clamp-2 leading-relaxed">
                           {entry.message}
                         </p>
                         {entry.error && (
-                          <p className="text-destructive text-[10px] mt-1 font-mono">{entry.error}</p>
+                          <p className="text-destructive text-[10px] mt-1 font-mono">
+                            {entry.error}
+                          </p>
                         )}
                       </div>
                     ))
@@ -356,8 +463,12 @@ export default function SendMessage() {
                 <Bot className="w-7 h-7 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-bold text-foreground">{profileName || "Dawinix AI"}</p>
-                <p className="text-xs text-muted-foreground">WhatsApp Business Profile</p>
+                <p className="text-sm font-bold text-foreground">
+                  {profileName || "Dawinix AI"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  WhatsApp Business Profile
+                </p>
               </div>
             </div>
 
@@ -372,7 +483,9 @@ export default function SendMessage() {
                 placeholder="Dawinix AI"
                 maxLength={60}
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Max 60 characters. Displayed in WhatsApp chats.</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Max 60 characters. Displayed in WhatsApp chats.
+              </p>
             </div>
 
             <div>
@@ -387,14 +500,19 @@ export default function SendMessage() {
                 placeholder="Your intelligent AI assistant — chat, code, and image generation in WhatsApp!"
                 maxLength={139}
               />
-              <p className="text-[10px] text-muted-foreground mt-1">{profileAbout.length}/139 characters</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {profileAbout.length}/139 characters
+              </p>
             </div>
 
             <div className="rounded-xl bg-yellow-400/5 border border-yellow-400/20 p-3">
               <div className="flex items-start gap-2">
                 <Settings className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground">
-                  Profile changes are applied to your WhatsApp Business account via the Cloud API. The name shown in WhatsApp chats depends on your Business account display name and may require Meta approval.
+                  Profile changes are applied to your WhatsApp Business account
+                  via the Cloud API. The name shown in WhatsApp chats depends on
+                  your Business account display name and may require Meta
+                  approval.
                 </p>
               </div>
             </div>
@@ -404,7 +522,11 @@ export default function SendMessage() {
               disabled={savingProfile}
               className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 transition-all"
             >
-              {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {savingProfile ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
               {savingProfile ? "Updating..." : "Update Bot Profile"}
             </button>
           </div>
@@ -413,12 +535,3 @@ export default function SendMessage() {
     </div>
   );
 }
-test before send its still show same error {"error":"Authentication Error"} {
-  "eventMessage": "POST | 500 | http://zmkdygoyejtywrftzmkd.backend.onspace.ai/functions/v1/send-whatsapp-message | Internal Server Error",
-  "functionId": "send-whatsapp-message",
-  "id": "49ee70af-878d-45b5-8319-3462cb459c70",
-  "logLevel": "ERROR",
-  "method": "POST",
-  "statusCode": 500,
-  "timestamp": 1777274627
-}.
