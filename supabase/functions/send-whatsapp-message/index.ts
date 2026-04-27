@@ -16,7 +16,7 @@ const supabase = createClient(
 
 const PHONE_NUMBER_ID = Deno.env.get("PHONE_NUMBER_ID") ?? "";
 const ACCESS_TOKEN = Deno.env.get("ACCESS_TOKEN") ?? "";
-const APP_ID = Deno.env.get("APP_ID") ?? ""; // <-- ADD THIS to your secrets
+const APP_ID = Deno.env.get("APP_ID") ?? "";
 const WA_API = `https://graph.facebook.com/v19.0`;
 
 async function logEvent(type: string, severity: string, message: string, metadata?: unknown) {
@@ -34,9 +34,7 @@ async function logEvent(type: string, severity: string, message: string, metadat
 
 function checkSecrets() {
   if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
-    throw new Error(
-      "PHONE_NUMBER_ID or ACCESS_TOKEN not configured in Edge Function secrets."
-    );
+    throw new Error("PHONE_NUMBER_ID or ACCESS_TOKEN not configured.");
   }
 }
 
@@ -58,58 +56,71 @@ async function sendWhatsAppText(to: string, body: string) {
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(
-      `WhatsApp API: ${data?.error?.message ?? `HTTP ${res.status}`}`
-    );
+    throw new Error(`WhatsApp API: ${data?.error?.message ?? `HTTP ${res.status}`}`);
   }
   return data;
 }
 
-// ── Resumable Upload to get profile_picture_handle ──────────────────────────
-async function getProfilePictureHandle(imageUrl: string): Promise<string> {
-  if (!APP_ID) {
-    throw new Error("APP_ID is required in secrets for profile picture upload.");
+// ── Resumable Upload: Step 1 — Create Session ───────────────────────────────
+async function createUploadSession(fileLength: number, fileType: string): Promise<string> {
+  if (!APP_ID) throw new Error("APP_ID secret is required for profile photo upload.");
+
+  // MUST use query params, NOT JSON body
+  const url = new URL(`${WA_API}/${APP_ID}/uploads`);
+  url.searchParams.set("access_token", ACCESS_TOKEN);
+  url.searchParams.set("file_length", String(fileLength));
+  url.searchParams.set("file_type", fileType);
+
+  const res = await fetch(url.toString(), { method: "POST" });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    throw new Error(`Create session failed: ${data?.error?.message ?? `HTTP ${res.status}`} — ${JSON.stringify(data)}`);
   }
 
-  // 1. Fetch image from Supabase Storage
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) throw new Error(`Failed to fetch image: HTTP ${imgRes.status}`);
-  const blob = await imgRes.blob();
-  const fileLength = blob.size;
-  const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+  console.log("[profile] Session created:", data.id);
+  return data.id; // e.g. "upload:MTphdHRhY2htZW50OjgyZWRlNDZh...?sig=ARYAKCBk..."
+}
 
-  // 2. Create resumable upload session
-  const sessionRes = await fetch(
-    `${WA_API}/${APP_ID}/uploads?access_token=${ACCESS_TOKEN}&file_length=${fileLength}&file_type=${encodeURIComponent(contentType)}`,
-    { method: "POST" }
-  );
-  const sessionData = await sessionRes.json();
-  if (!sessionRes.ok) {
-    throw new Error(`Upload session failed: ${sessionData?.error?.message ?? `HTTP ${sessionRes.status}`}`);
-  }
-  const sessionId = sessionData.id; // e.g. "upload:XXXXX?sig=XXXXX"
-  console.log("[profile] Upload session:", sessionId);
-
-  // 3. Upload file bytes to session
-  const uploadRes = await fetch(`${WA_API}/${sessionId}`, {
+// ── Resumable Upload: Step 2 — Upload File Bytes ────────────────────────────
+async function uploadFileBytes(sessionId: string, blob: Blob): Promise<string> {
+  // MUST send raw binary, NOT multipart/form-data
+  const res = await fetch(`${WA_API}/${sessionId}`, {
     method: "POST",
     headers: {
       Authorization: `OAuth ${ACCESS_TOKEN}`,
       "file_offset": "0",
-      "Content-Type": "multipart/form-data", // Let browser/Deno set boundary
+      "Content-Type": "application/octet-stream",
     },
     body: blob,
   });
-  const uploadData = await uploadRes.json();
-  if (!uploadRes.ok) {
-    throw new Error(`Upload failed: ${uploadData?.error?.message ?? `HTTP ${uploadRes.status}`}`);
-  }
-  const handle = uploadData.h; // The profile_picture_handle, e.g. "4::XXX==:XXXXXX"
-  console.log("[profile] Got handle:", handle);
 
-  if (!handle) {
-    throw new Error("No handle returned from resumable upload.");
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    throw new Error(`Upload bytes failed: ${data?.error?.message ?? `HTTP ${res.status}`} — ${JSON.stringify(data)}`);
   }
+
+  console.log("[profile] Upload result:", data);
+  if (!data.h) {
+    throw new Error("No handle (h) returned from upload. Response: " + JSON.stringify(data));
+  }
+  return data.h; // e.g. "4::XXX==:XXXXXX"
+}
+
+// ── Get profile_picture_handle from image URL ───────────────────────────────
+async function getProfilePictureHandle(imageUrl: string): Promise<string> {
+  // 1. Fetch image from Supabase Storage
+  const imgRes = await fetch(imageUrl);
+  if (!imgRes.ok) throw new Error(`Failed to fetch image: HTTP ${imgRes.status}`);
+  const blob = await imgRes.blob();
+  const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+
+  // 2. Create session (query params)
+  const sessionId = await createUploadSession(blob.size, contentType);
+
+  // 3. Upload raw bytes (NOT multipart)
+  const handle = await uploadFileBytes(sessionId, blob);
+
   return handle;
 }
 
@@ -125,9 +136,10 @@ async function updateBotProfile(options: {
   if (options.photoUrl) {
     console.log("[profile] Starting resumable upload for profile photo...");
     profilePictureHandle = await getProfilePictureHandle(options.photoUrl);
+    console.log("[profile] Got handle:", profilePictureHandle);
   }
 
-  // Build payload — ONLY include fields that have values
+  // Build payload — ONLY include fields with values
   const payload: Record<string, unknown> = {
     messaging_product: "whatsapp",
   };
@@ -140,8 +152,7 @@ async function updateBotProfile(options: {
     payload.profile_picture_handle = profilePictureHandle;
   }
 
-  // Validate: we need at least something to update
-  const hasUpdates = Object.keys(payload).length > 1; // >1 because messaging_product is always there
+  const hasUpdates = Object.keys(payload).length > 1;
   if (!hasUpdates) {
     throw new Error("No valid profile fields to update (about or photo required)");
   }
@@ -219,7 +230,6 @@ serve(async (req) => {
         { phone, messageId: result?.messages?.[0]?.id }
       );
 
-      // Upsert conversation record
       const { data: existing } = await supabase
         .from("conversations")
         .select("id, message_count")
@@ -277,7 +287,6 @@ serve(async (req) => {
         photoUrl: body.profile_photo_url,
       });
 
-      // Persist config values
       const upserts = [];
       if (body.profile_name) {
         upserts.push({ key: "bot_name", value: JSON.stringify(body.profile_name), updated_at: new Date().toISOString() });
