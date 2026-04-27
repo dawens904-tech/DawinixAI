@@ -589,4 +589,4 @@ export default function SendMessage() {
     </div>
   );
 }
-fix Profile update failed: {"error":"WhatsApp Profile API: (#100) The parameter messaging_product is required."}
+

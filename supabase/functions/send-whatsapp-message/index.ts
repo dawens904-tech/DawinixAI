@@ -115,9 +115,8 @@ async function updateBotProfile(options: {
     console.log("[profile] Got media_id:", profilePictureHandle);
   }
 
-  // Build profile update payload — only include non-empty fields
-  // messaging_product is NOT included here; it belongs only on /messages
-  const payload: Record<string, unknown> = {};
+  // Build profile update payload — messaging_product is required by the API
+  const payload: Record<string, unknown> = { messaging_product: "whatsapp" };
   if (options.about && options.about.trim()) payload.about = options.about.trim().slice(0, 139);
   if (profilePictureHandle) payload.profile_picture_handle = profilePictureHandle;
   // Note: display name update requires a separate name change request with Meta approval
