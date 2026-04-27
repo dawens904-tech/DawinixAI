@@ -115,13 +115,16 @@ async function updateBotProfile(options: {
     console.log("[profile] Got media_id:", profilePictureHandle);
   }
 
-  // Build profile update payload
-  const payload: Record<string, unknown> = {
-    messaging_product: "whatsapp",
-  };
-  if (options.about) payload.about = options.about;
+  // Build profile update payload — only include non-empty fields
+  // messaging_product is NOT included here; it belongs only on /messages
+  const payload: Record<string, unknown> = {};
+  if (options.about && options.about.trim()) payload.about = options.about.trim().slice(0, 139);
   if (profilePictureHandle) payload.profile_picture_handle = profilePictureHandle;
   // Note: display name update requires a separate name change request with Meta approval
+
+  if (Object.keys(payload).length === 0) {
+    throw new Error("No valid profile fields to update (about or photo required)");
+  }
 
   const profileRes = await fetch(
     `${WA_API}/${PHONE_NUMBER_ID}/whatsapp_business_profile`,
