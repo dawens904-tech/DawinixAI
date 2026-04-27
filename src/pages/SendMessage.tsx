@@ -598,3 +598,5 @@ export default function SendMessage() {
   );
 }
 
+please dont skip make all this change Before sending the AI reply in the whatsapp-webhook edge function, send a WhatsApp 'typing' status (POST to /{phone-number-id}/messages with type: 'reaction' or use the typing indicator endpoint) so users see the bot is processing, making it feel more human and ChatGPT-like. Add a Groups section to the Analytics page showing: active groups count, messages per group (bar chart), most active group members, and group vs DM message ratio — pulling from the conversations and messages tables filtered by group phone IDs.
+  
