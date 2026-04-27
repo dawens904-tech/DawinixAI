@@ -355,3 +355,11 @@ export default function UsersPage() {
     </div>
   );
 }
+remove all demo add new and Uncaught TypeError: date.getTime is not a function Dismiss
+Fix now
+Runtime Error
+File:
+https://9b6tf3.onspace.meme/node_modules/.vite/deps/chunk-6BKLQ22S.js?v=b9dc4992
+First occurred:
+2026-04-27 03:07:30
+TypeError: date.getTime is not a function
