@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import {
   Send, Phone, MessageSquare, CheckCircle, XCircle,
-  Loader2, History, User, Settings, RefreshCw, Bot
+  Loader2, History, User, Settings, RefreshCw, Bot, AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { FunctionsHttpError } from "@supabase/supabase-js";
@@ -36,7 +36,6 @@ export default function SendMessage() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
-    // Load recent conversations for quick select
     supabase
       .from("conversations")
       .select("phone, user_name")
@@ -44,7 +43,6 @@ export default function SendMessage() {
       .limit(10)
       .then(({ data }) => setRecentUsers(data ?? []));
 
-    // Load current bot config
     supabase
       .from("bot_config")
       .select("key, value")
@@ -160,157 +158,190 @@ export default function SendMessage() {
       </div>
 
       {tab === "send" && (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          {/* Compose panel */}
-          <div className="lg:col-span-3 space-y-4">
-            <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-primary" />
-                Compose Message
-              </h3>
+        <div className="space-y-4">
+          {/* #131030 Test-mode warning banner */}
+          <div className="rounded-xl bg-yellow-400/5 border border-yellow-400/30 p-4 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+            <div className="text-[11px] space-y-1.5">
+              <p className="font-semibold text-yellow-400 text-xs">
+                Error #131030 — WhatsApp Test Mode: Recipient Not in Allowed List
+              </p>
+              <p className="text-muted-foreground">
+                Your Meta app is in <strong className="text-foreground">Development mode</strong>. Only pre-verified numbers can receive messages. To send to{" "}
+                <code className="font-mono bg-black/30 px-1 rounded text-primary">+18573917861</code>:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-muted-foreground pl-1">
+                <li>
+                  Go to <strong className="text-foreground">Meta Developer Console</strong> → your app →{" "}
+                  <strong className="text-foreground">WhatsApp → API Setup</strong>
+                </li>
+                <li>
+                  Under the <strong className="text-foreground">"To"</strong> field, click{" "}
+                  <strong className="text-foreground">"Manage phone number list"</strong>
+                </li>
+                <li>
+                  Add <code className="font-mono bg-black/30 px-1 rounded text-primary">+18573917861</code> and verify it with the OTP sent by WhatsApp
+                </li>
+                <li>
+                  <strong className="text-foreground">Or go live:</strong> complete{" "}
+                  <strong className="text-foreground">Meta Business Verification</strong> to remove all number restrictions permanently
+                </li>
+              </ol>
+            </div>
+          </div>
 
-              {/* Phone number */}
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">
-                  Recipient Phone Number *
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-dark-900 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 transition-colors"
-                    placeholder="15551234567 (with country code, no +)"
-                  />
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Include country code, no spaces or + symbol. E.g. 15551234567
-                </p>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Compose panel */}
+            <div className="lg:col-span-3 space-y-4">
+              <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-primary" />
+                  Compose Message
+                </h3>
 
-              {/* Recent users */}
-              {recentUsers.length > 0 && (
+                {/* Phone number */}
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
-                    Recent Users
+                  <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    Recipient Phone Number *
                   </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-dark-900 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 transition-colors"
+                      placeholder="15551234567 (with country code, no +)"
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Include country code, no spaces or + symbol. E.g. 18573917861
+                  </p>
+                </div>
+
+                {/* Recent users */}
+                {recentUsers.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-2">
+                      Recent Users
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recentUsers.slice(0, 6).map((u) => (
+                        <button
+                          key={u.phone}
+                          onClick={() => setPhone(u.phone)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] border transition-all",
+                            phone === u.phone
+                              ? "bg-primary/10 border-primary/30 text-primary"
+                              : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:border-primary/20"
+                          )}
+                        >
+                          <User className="w-3 h-3" />
+                          {u.user_name ?? u.phone}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Message */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-foreground">
+                      Message *
+                    </label>
+                    <span className={cn("text-[10px] font-mono", charCount > 4000 ? "text-destructive" : "text-muted-foreground")}>
+                      {charCount}/4096
+                    </span>
+                  </div>
+                  <textarea
+                    value={message}
+                    onChange={(e) => { setMessage(e.target.value); setCharCount(e.target.value.length); }}
+                    rows={5}
+                    className={cn(inputClass, "resize-none leading-relaxed")}
+                    placeholder={"Type your message here...\n\nSupports WhatsApp formatting:\n*bold*, _italic_, ~strikethrough~, `code`"}
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Supports WhatsApp formatting: *bold*, _italic_, ~strikethrough~, {"`"}monospace{"`"}
+                  </p>
+                </div>
+
+                {/* Quick templates */}
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-2">Quick Templates</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {recentUsers.slice(0, 6).map((u) => (
+                    {[
+                      { label: "Welcome", text: "👋 Welcome to *Dawinix AI*! Type /start to begin or just ask me anything. 🚀" },
+                      { label: "Reminder", text: "🔔 *Reminder from Dawinix AI*\n\nDon't forget — I'm here 24/7 to help! Just send a message anytime. 💬" },
+                      { label: "Update", text: "🆕 *Bot Update*\n\nWe've added new features! Type /help to see all available commands. 🎉" },
+                    ].map(({ label, text }) => (
                       <button
-                        key={u.phone}
-                        onClick={() => setPhone(u.phone)}
-                        className={cn(
-                          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] border transition-all",
-                          phone === u.phone
-                            ? "bg-primary/10 border-primary/30 text-primary"
-                            : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:border-primary/20"
-                        )}
+                        key={label}
+                        onClick={() => { setMessage(text); setCharCount(text.length); }}
+                        className="px-2.5 py-1 rounded-lg bg-secondary border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/20 transition-all"
                       >
-                        <User className="w-3 h-3" />
-                        {u.user_name ?? u.phone}
+                        {label}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {/* Message */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-foreground">
-                    Message *
-                  </label>
-                  <span className={cn("text-[10px] font-mono", charCount > 4000 ? "text-destructive" : "text-muted-foreground")}>
-                    {charCount}/4096
-                  </span>
-                </div>
-                <textarea
-                  value={message}
-                  onChange={(e) => { setMessage(e.target.value); setCharCount(e.target.value.length); }}
-                  rows={5}
-                  className={cn(inputClass, "resize-none leading-relaxed")}
-                  placeholder="Type your message here...&#10;&#10;Supports WhatsApp formatting:&#10;*bold*, _italic_, ~strikethrough~, `code`"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Supports WhatsApp formatting: *bold*, _italic_, ~strikethrough~, `monospace`
-                </p>
+                <button
+                  onClick={handleSend}
+                  disabled={sending || !phone.trim() || !message.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 transition-all"
+                >
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {sending ? "Sending..." : "Send WhatsApp Message"}
+                </button>
               </div>
-
-              {/* Quick templates */}
-              <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-2">Quick Templates</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { label: "Welcome", text: "👋 Welcome to *Dawinix AI*! Type /start to begin or just ask me anything. 🚀" },
-                    { label: "Reminder", text: "🔔 *Reminder from Dawinix AI*\n\nDon't forget — I'm here 24/7 to help! Just send a message anytime. 💬" },
-                    { label: "Update", text: "🆕 *Bot Update*\n\nWe've added new features! Type /help to see all available commands. 🎉" },
-                  ].map(({ label, text }) => (
-                    <button
-                      key={label}
-                      onClick={() => { setMessage(text); setCharCount(text.length); }}
-                      className="px-2.5 py-1 rounded-lg bg-secondary border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/20 transition-all"
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={handleSend}
-                disabled={sending || !phone.trim() || !message.trim()}
-                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 transition-all"
-              >
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {sending ? "Sending..." : "Send WhatsApp Message"}
-              </button>
             </div>
-          </div>
 
-          {/* History panel */}
-          <div className="lg:col-span-2">
-            <div className="rounded-2xl bg-card border border-border overflow-hidden h-full">
-              <div className="px-4 py-3 border-b border-border bg-dark-800">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <History className="w-4 h-4 text-muted-foreground" />
-                  Send History
-                </h3>
-              </div>
-              <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto scrollbar-thin">
-                {log.length === 0 ? (
-                  <div className="text-center py-10">
-                    <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground">No messages sent yet</p>
-                  </div>
-                ) : (
-                  log.map((entry, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "p-3 rounded-xl border text-xs",
-                        entry.status === "success"
-                          ? "bg-primary/5 border-primary/20"
-                          : "bg-destructive/5 border-destructive/20"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        {entry.status === "success"
-                          ? <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />
-                          : <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />}
-                        <span className="font-mono text-muted-foreground">+{entry.phone}</span>
-                        <span className="ml-auto text-[10px] text-muted-foreground font-mono">
-                          {entry.timestamp.toLocaleTimeString("en-US", { hour12: false })}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground line-clamp-2 leading-relaxed">
-                        {entry.message}
-                      </p>
-                      {entry.error && (
-                        <p className="text-destructive text-[10px] mt-1 font-mono">{entry.error}</p>
-                      )}
+            {/* History panel */}
+            <div className="lg:col-span-2">
+              <div className="rounded-2xl bg-card border border-border overflow-hidden h-full">
+                <div className="px-4 py-3 border-b border-border bg-dark-800">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <History className="w-4 h-4 text-muted-foreground" />
+                    Send History
+                  </h3>
+                </div>
+                <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto scrollbar-thin">
+                  {log.length === 0 ? (
+                    <div className="text-center py-10">
+                      <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                      <p className="text-xs text-muted-foreground">No messages sent yet</p>
                     </div>
-                  ))
-                )}
+                  ) : (
+                    log.map((entry, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "p-3 rounded-xl border text-xs",
+                          entry.status === "success"
+                            ? "bg-primary/5 border-primary/20"
+                            : "bg-destructive/5 border-destructive/20"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          {entry.status === "success"
+                            ? <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />
+                            : <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />}
+                          <span className="font-mono text-muted-foreground">+{entry.phone}</span>
+                          <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+                            {entry.timestamp.toLocaleTimeString("en-US", { hour12: false })}
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground line-clamp-2 leading-relaxed">
+                          {entry.message}
+                        </p>
+                        {entry.error && (
+                          <p className="text-destructive text-[10px] mt-1 font-mono">{entry.error}</p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -382,4 +413,3 @@ export default function SendMessage() {
     </div>
   );
 }
-please fix this allow this {"error":"(#131030) Recipient phone number not in allowed list"} this num:18573917861.
