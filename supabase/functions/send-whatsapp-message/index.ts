@@ -65,7 +65,6 @@ async function sendWhatsAppText(to: string, body: string) {
 async function createUploadSession(fileLength: number, fileType: string): Promise<string> {
   if (!APP_ID) throw new Error("APP_ID secret is required for profile photo upload.");
 
-  // MUST use query params, NOT JSON body
   const url = new URL(`${WA_API}/${APP_ID}/uploads`);
   url.searchParams.set("access_token", ACCESS_TOKEN);
   url.searchParams.set("file_length", String(fileLength));
@@ -79,32 +78,35 @@ async function createUploadSession(fileLength: number, fileType: string): Promis
   }
 
   console.log("[profile] Session created:", data.id);
-  return data.id; // e.g. "upload:MTphdHRhY2htZW50OjgyZWRlNDZh...?sig=ARYAKCBk..."
+  return data.id;
 }
 
-// ── Resumable Upload: Step 2 — Upload File Bytes ────────────────────────────
-async function uploadFileBytes(sessionId: string, blob: Blob): Promise<string> {
-  // MUST send raw binary, NOT multipart/form-data
+// ── Resumable Upload: Step 2 — Upload File via MULTIPART/FORM-DATA ──────────
+async function uploadFileMultipart(sessionId: string, blob: Blob, fileName: string, contentType: string): Promise<string> {
+  // CRITICAL: Must use multipart/form-data, NOT raw binary/octet-stream
+  const formData = new FormData();
+  formData.append("file", blob, fileName);
+
   const res = await fetch(`${WA_API}/${sessionId}`, {
     method: "POST",
     headers: {
       Authorization: `OAuth ${ACCESS_TOKEN}`,
       "file_offset": "0",
-      "Content-Type": "application/octet-stream",
+      // DO NOT set Content-Type manually — Deno will set the multipart boundary automatically
     },
-    body: blob,
+    body: formData,
   });
 
   const data = await res.json();
   if (!res.ok || data.error) {
-    throw new Error(`Upload bytes failed: ${data?.error?.message ?? `HTTP ${res.status}`} — ${JSON.stringify(data)}`);
+    throw new Error(`Upload failed: ${data?.error?.message ?? `HTTP ${res.status}`} — ${JSON.stringify(data)}`);
   }
 
   console.log("[profile] Upload result:", data);
   if (!data.h) {
     throw new Error("No handle (h) returned from upload. Response: " + JSON.stringify(data));
   }
-  return data.h; // e.g. "4::XXX==:XXXXXX"
+  return data.h;
 }
 
 // ── Get profile_picture_handle from image URL ───────────────────────────────
@@ -115,11 +117,11 @@ async function getProfilePictureHandle(imageUrl: string): Promise<string> {
   const blob = await imgRes.blob();
   const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
 
-  // 2. Create session (query params)
+  // 2. Create session
   const sessionId = await createUploadSession(blob.size, contentType);
 
-  // 3. Upload raw bytes (NOT multipart)
-  const handle = await uploadFileBytes(sessionId, blob);
+  // 3. Upload via multipart/form-data
+  const handle = await uploadFileMultipart(sessionId, blob, "profile.jpg", contentType);
 
   return handle;
 }
