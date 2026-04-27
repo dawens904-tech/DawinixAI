@@ -292,9 +292,6 @@ serve(async (req) => {
       });
 
       const upserts = [];
-      if (body.profile_name) {
-        upserts.push({ key: "bot_name", value: JSON.stringify(body.profile_name), updated_at: new Date().toISOString() });
-      }
       if (body.profile_about) {
         upserts.push({ key: "bot_about", value: JSON.stringify(body.profile_about), updated_at: new Date().toISOString() });
       }
@@ -305,7 +302,7 @@ serve(async (req) => {
       await logEvent(
         "config",
         "success",
-        `[Admin] Bot profile updated: name="${body.profile_name ?? "—"}" about="${(body.profile_about ?? "").slice(0, 40)}" photo=${body.profile_photo_url ? "yes" : "no"}`
+        `[Admin] Bot profile updated: about="${(body.profile_about ?? "").slice(0, 40)}" photo=${body.profile_photo_url ? "yes" : "no"}`
       );
 
       return new Response(JSON.stringify({ success: true, result }), {

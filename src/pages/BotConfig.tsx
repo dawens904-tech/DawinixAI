@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Eye, EyeOff, Save, Copy, Check, Settings,
-  Webhook, Brain, Shield, MessageSquare, Loader2, RefreshCw
+  Webhook, Brain, Shield, MessageSquare, Loader2, RefreshCw, Users
 } from "lucide-react";
 
 interface ConfigRow {
@@ -20,6 +20,8 @@ interface BotSettings {
   rate_limit: number;
   enabled_commands: string[];
   text_without_command: boolean;
+  group_mode: "mention_only" | "all_messages";
+  group_respond_all: boolean;
 }
 
 const DEFAULT_SETTINGS: BotSettings = {
@@ -31,11 +33,14 @@ const DEFAULT_SETTINGS: BotSettings = {
   rate_limit: 50,
   enabled_commands: ["/ai", "/code", "/image", "/help", "/start"],
   text_without_command: true,
+  group_mode: "mention_only",
+  group_respond_all: false,
 };
 
 const TABS = [
   { id: "ai", label: "AI Settings", icon: Brain },
   { id: "commands", label: "Commands", icon: MessageSquare },
+  { id: "groups", label: "Groups", icon: Users },
   { id: "security", label: "Security", icon: Shield },
   { id: "whatsapp", label: "WhatsApp API", icon: Webhook },
 ];
@@ -107,6 +112,11 @@ export default function BotConfig() {
         map.text_without_command === true ||
         map.text_without_command === "true" ||
         parseVal(map.text_without_command ?? "true") === "true",
+      group_mode: (parseVal(map.group_mode ?? "mention_only") as BotSettings["group_mode"]) ?? "mention_only",
+      group_respond_all:
+        map.group_respond_all === true ||
+        map.group_respond_all === "true" ||
+        parseVal(map.group_respond_all ?? "false") === "true",
     });
     setLoading(false);
   }, []);
@@ -123,6 +133,8 @@ export default function BotConfig() {
       { key: "rate_limit", value: settings.rate_limit },
       { key: "enabled_commands", value: settings.enabled_commands },
       { key: "text_without_command", value: settings.text_without_command },
+      { key: "group_mode", value: JSON.stringify(settings.group_mode) },
+      { key: "group_respond_all", value: settings.group_respond_all },
     ];
 
     const { error } = await supabase
@@ -345,6 +357,102 @@ export default function BotConfig() {
                 </p>
               </div>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Groups ── */}
+      {tab === "groups" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Users className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-semibold">Group Chat Support</h3>
+              <span className="ml-auto text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                WhatsApp Groups
+              </span>
+            </div>
+
+            <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 text-[11px] text-muted-foreground space-y-1.5">
+              <p className="font-semibold text-primary">How to add the bot to a group:</p>
+              <ol className="list-decimal list-inside space-y-1 pl-1">
+                <li>Open the WhatsApp group → tap the group name</li>
+                <li>Tap <strong className="text-foreground">"Add Participants"</strong></li>
+                <li>Search for your WhatsApp Business number and add it</li>
+                <li>The bot will now receive group messages based on your settings below</li>
+              </ol>
+            </div>
+
+            <Field label="Group Response Mode" hint="Control when the bot responds in group chats">
+              <div className="space-y-2">
+                {([
+                  {
+                    value: "mention_only",
+                    label: "Mention Only (Recommended)",
+                    desc: "Bot only responds when @mentioned or when someone replies to its message",
+                    icon: "@",
+                  },
+                  {
+                    value: "all_messages",
+                    label: "All Group Messages",
+                    desc: "Bot responds to every message sent in the group (high volume)",
+                    icon: "💬",
+                  },
+                ] as const).map(({ value, label, desc, icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => setSettings((p) => ({
+                      ...p,
+                      group_mode: value,
+                      group_respond_all: value === "all_messages",
+                    }))}
+                    className={cn(
+                      "w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left",
+                      settings.group_mode === value
+                        ? "bg-primary/10 border-primary/30"
+                        : "bg-secondary border-border hover:border-border/70"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 mt-0.5",
+                      settings.group_mode === value ? "bg-primary/20" : "bg-card"
+                    )}>
+                      {icon}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className={cn(
+                          "text-xs font-semibold",
+                          settings.group_mode === value ? "text-primary" : "text-foreground"
+                        )}>
+                          {label}
+                        </p>
+                        {settings.group_mode === value && (
+                          <Check className="w-3 h-3 text-primary" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <div className="rounded-xl bg-yellow-400/5 border border-yellow-400/20 p-3">
+              <div className="flex items-start gap-2">
+                <Settings className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-muted-foreground space-y-1">
+                  <p className="font-semibold text-yellow-400">Group mention syntax</p>
+                  <p>Users can mention the bot in groups using:</p>
+                  <ul className="list-disc list-inside pl-1 space-y-0.5">
+                    <li><code className="text-foreground">@{"<phone number>"}</code> — mention by number</li>
+                    <li><code className="text-foreground">@Dawinix AI</code> or <code className="text-foreground">@dawinix</code> — mention by name</li>
+                    <li>Reply directly to any of the bot's messages</li>
+                  </ul>
+                  <p className="mt-1">Invite links are NOT sent in group chats.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

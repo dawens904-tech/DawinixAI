@@ -190,7 +190,6 @@ export default function SendMessage() {
     const { data, error } = await supabase.functions.invoke("send-whatsapp-message", {
       body: {
         action: "update_profile",
-        profile_name: profileName.trim() || undefined,
         profile_about: profileAbout.trim() || undefined,
         profile_photo_url: photoUrl || undefined,
       },
@@ -525,21 +524,20 @@ export default function SendMessage() {
               </p>
             </div>
 
-            {/* Bot name */}
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">
-                Bot Display Name
-              </label>
-              <input
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-                className={inputClass}
-                placeholder="Dawinix AI"
-                maxLength={60}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Max 60 characters. Displayed in WhatsApp chats.
-              </p>
+            {/* Bot name — informational only, cannot be changed via API */}
+            <div className="rounded-xl bg-secondary border border-border p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-muted-foreground space-y-1">
+                  <p className="font-semibold text-foreground">Display Name cannot be changed via API</p>
+                  <p>WhatsApp Business display name changes require <strong className="text-foreground">Meta Business Verification</strong> and go through a manual review process (24–48 hrs). To request a name change:</p>
+                  <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                    <li>Go to <strong className="text-foreground">Meta Business Suite → WhatsApp Manager</strong></li>
+                    <li>Select your phone number → <strong className="text-foreground">Profile</strong></li>
+                    <li>Click <strong className="text-foreground">Edit</strong> and submit a name change request</li>
+                  </ol>
+                </div>
+              </div>
             </div>
 
             {/* About */}
