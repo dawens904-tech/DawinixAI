@@ -413,3 +413,12 @@ export default function SendMessage() {
     </div>
   );
 }
+test before send its still show same error {"error":"Authentication Error"} {
+  "eventMessage": "POST | 500 | http://zmkdygoyejtywrftzmkd.backend.onspace.ai/functions/v1/send-whatsapp-message | Internal Server Error",
+  "functionId": "send-whatsapp-message",
+  "id": "49ee70af-878d-45b5-8319-3462cb459c70",
+  "logLevel": "ERROR",
+  "method": "POST",
+  "statusCode": 500,
+  "timestamp": 1777274627
+}.
