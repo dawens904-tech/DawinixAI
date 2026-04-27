@@ -590,3 +590,4 @@ export default function SendMessage() {
   );
 }
 
+fix and test first tak you time Profile update failed: {"error":"WhatsApp Profile API: Parameter value is not valid"}
