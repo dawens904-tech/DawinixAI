@@ -210,6 +210,23 @@ async function generateImage(prompt: string, phone: string): Promise<string> {
 
 // ── WhatsApp Messaging ─────────────────────────────────────────────────────
 
+// Mark incoming message as read — shows blue ticks and activates typing bubble on user's end
+async function sendReadReceipt(messageId: string) {
+  try {
+    await fetch(`https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+      }),
+    });
+  } catch {
+    // non-critical — don't block message processing
+  }
+}
+
 async function sendWhatsAppText(to: string, body: string) {
   const res = await fetch(`https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
@@ -456,6 +473,12 @@ serve(async (req) => {
 
     const replyTo = isGroup && groupId ? groupId : from;
     const contextPhone = from; // always use sender's phone for per-user memory
+
+    // Mark incoming message as read — shows blue ticks, activates typing indicator on user's end
+    const messageId = message.id as string | undefined;
+    if (messageId) {
+      sendReadReceipt(messageId); // fire-and-forget, don't await
+    }
 
     await logEvent(
       "message",
