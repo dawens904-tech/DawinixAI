@@ -11,6 +11,8 @@ import SetupGuide from "@/pages/SetupGuide";
 import SystemLogs from "@/pages/SystemLogs";
 import WebhookSimulator from "@/pages/WebhookSimulator";
 import CommandBuilder from "@/pages/CommandBuilder";
+import SendMessage from "@/pages/SendMessage";
+import Broadcast from "@/pages/Broadcast";
 import NotFound from "@/pages/NotFound";
 import { useState } from "react";
 
@@ -34,6 +36,8 @@ export default function App() {
               <Route path="/logs" element={<SystemLogs />} />
               <Route path="/simulator" element={<WebhookSimulator />} />
               <Route path="/commands" element={<CommandBuilder />} />
+              <Route path="/send" element={<SendMessage />} />
+              <Route path="/broadcast" element={<Broadcast />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>

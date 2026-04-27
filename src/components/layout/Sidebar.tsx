@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, MessageSquare, Users, Settings,
-  BarChart3, BookOpen, X, Zap, Circle, Terminal, FlaskConical, Wrench
+  BarChart3, BookOpen, X, Zap, Circle, Terminal, FlaskConical, Wrench, Send, Radio
 } from "lucide-react";
 
 interface SidebarProps {
@@ -20,6 +20,8 @@ const MAIN_NAV = [
 const TOOLS_NAV = [
   { label: "Bot Config", path: "/config", icon: Settings },
   { label: "Command Builder", path: "/commands", icon: Wrench },
+  { label: "Send Message", path: "/send", icon: Send },
+  { label: "Broadcast", path: "/broadcast", icon: Radio },
   { label: "Simulator", path: "/simulator", icon: FlaskConical },
   { label: "System Logs", path: "/logs", icon: Terminal },
   { label: "Setup Guide", path: "/setup", icon: BookOpen },
