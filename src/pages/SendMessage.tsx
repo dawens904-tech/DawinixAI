@@ -598,4 +598,4 @@ export default function SendMessage() {
   );
 }
 
-
+now create a .md explain how to make the ai when i tex the number in whatsapp its reply me in real ai chatbot how to setup all with no error.
