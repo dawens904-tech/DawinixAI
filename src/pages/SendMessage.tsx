@@ -597,3 +597,6 @@ export default function SendMessage() {
     </div>
   );
 }
+all set but when i tex the ai its not reply and * The bot must respond to every incoming message automatically
+* No need for commands like /ai or /start
+* Maintain conversation context per user (chat memory).
